@@ -8,10 +8,11 @@
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
     "target": "ES2020",
-    "module": "commonjs",
+    "module": "NodeNext",
     "rootDir": "./src",
     "outDir": "./dist",
     "esModuleInterop": true,
+    "moduleResolution": "NodeNext",
     "types": [],
     // For nodejs:
     // "lib": ["esnext"],
@@ -38,7 +39,7 @@
     // Recommended Options
     "strict": true,
     "jsx": "react-jsx",
-    "verbatimModuleSyntax": true,
+    "verbatimModuleSyntax": false,
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
