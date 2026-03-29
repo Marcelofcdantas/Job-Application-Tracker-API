@@ -8,6 +8,10 @@ export const sequelize = new Sequelize(
   {
     host: getEnv("DB_HOST"),
     dialect: "mysql",
-    logging: false,
+    logging: false
   }
 );
+
+export async function connectDB() {
+  await sequelize.authenticate();
+}

@@ -1,10 +1,21 @@
 import app from "./app.js";
-import { sequelize } from "./config/database.js";
+import { connectDB, sequelize } from "./config/database.js";
+import { logger } from "./utils/logger.js";
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
 
-sequelize.sync().then(() => {
+async function start() {
+  try {
+    await connectDB();
+    await sequelize.sync();
+
     app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
+      logger.info({ port: PORT }, "Server running");
     });
-});
+  } catch (error) {
+    logger.error({ error }, "Failed to start server");
+    process.exit(1);
+  }
+}
+
+start();
