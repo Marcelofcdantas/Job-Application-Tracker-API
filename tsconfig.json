@@ -18,6 +18,8 @@
     // "lib": ["esnext"],
     // "types": ["node"],
     // and npm install -D @types/node
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
 
     // Other Outputs
     "sourceMap": true,

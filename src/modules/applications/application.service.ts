@@ -1,4 +1,4 @@
-import { Application } from "./application.model";
+import { Application } from "./application.model.js";
 
 export class ApplicationService {
     async create(data: any, userId: string) {

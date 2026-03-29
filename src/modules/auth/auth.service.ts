@@ -1,18 +1,48 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { User } from "../users/user.model";
+import { User } from "../users/user.model.js";
+
+
+function validateEmail(email: string) {
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!regex.test(email)) {
+    throw new Error("Invalid email format");
+  }
+}
+
+function validatePassword(password: string) {
+  const regex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
+
+  if (!regex.test(password)) {
+    throw new Error(
+      "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character"
+    );
+  }
+}
 
 export class AuthService {
-    async register(email: string, password: string) {
-        const hashed = await bcrypt.hash(password, 10);
+  async register(email: string, password: string) {
+    validateEmail(email);
+    validatePassword(password);
 
-        const user = await User.create({
-            email,
-            password: hashed,
-        });
+    const existingUser = await User.findOne({ where: { email } });
 
-        return user;
+    if (existingUser) {
+      throw new Error("User already exists");
     }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      email,
+      password: hashed,
+    });
+
+    const { password: _, ...userSafe } = user.toJSON();
+    return userSafe;
+  }
 
     async login(email: string, password: string) {
         const user = await User.findOne({ where: {email} });

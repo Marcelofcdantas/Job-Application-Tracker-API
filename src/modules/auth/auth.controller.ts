@@ -1,15 +1,23 @@
 import { Request, Response } from "express";
-import { AuthService } from "./auth.service";
+import { AuthService } from "./auth.service.js";
 
 const service = new AuthService();
 
 export class AuthController {
     async register(req: Request, res: Response) {
-        const { email, password } = req.body;
+        try {
+            const { email, password } = req.body;
 
-        const user = await service.register(email, password);
+            const user = await service.register(email, password);
 
-        res.json(user);
+            res.status(201).json(user);
+        } catch (error) {
+            if (error instanceof Error) {
+                res.status(400).json({ error: error.message });
+            } else {
+                res.status(400).json({ error: "Unknown error" });
+            }
+        }
     }
 
     async login(req: Request, res: Response) {
