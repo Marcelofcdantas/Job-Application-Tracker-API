@@ -18,11 +18,6 @@ export const loginSchema = z.object({
   password: z.string().min(1)
 });
 
-export const verifyMfaSchema = z.object({
-  email: z.string().email(),
-  code: z.string().length(6)
-});
-
 export const refreshSchema = z.object({
   refreshToken: z.string().min(1)
 });

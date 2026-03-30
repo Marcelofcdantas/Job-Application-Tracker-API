@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
-import { AppError } from "../utils/AppError.js";
-import { logger } from "../utils/logger.js";
+import { AppError } from "../utils/AppError";
+import { logger } from "../utils/logger";
 
 export function errorHandler(err: unknown, req: Request, res: Response, next: NextFunction) {
   if (err instanceof ZodError) {

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { AuthService } from "./auth.service.js";
+import { AuthService } from "./auth.service";
 
 const service = new AuthService();
 
@@ -20,18 +20,15 @@ export class AuthController {
 
     return res.json({
       data,
-      message: "Password accepted. MFA verification required."
+      message: "Login link sent to your email."
     });
   }
 
-  async verifyMfa(req: Request, res: Response) {
-    const { email, code } = req.body;
-    const data = await service.verifyMfa(email, code, req.ip);
+  async verifyEmail(req: Request, res: Response) {
+  const { token } = req.body;
+  const data = await service.verifyEmail(token);
 
-    return res.json({
-      data,
-      message: "Login successful"
-    });
+  return res.json({ data });
   }
 
   async refresh(req: Request, res: Response) {

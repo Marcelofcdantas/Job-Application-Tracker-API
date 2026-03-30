@@ -1,4 +1,4 @@
-import { PasswordReset } from "./password-reset.model.js";
+import { PasswordReset } from "./password-reset.model";
 
 export class PasswordResetRepository {
   async create(data: { userId: string; token: string; expiresAt: Date }) {

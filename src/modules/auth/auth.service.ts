@@ -1,370 +1,183 @@
 import bcrypt from "bcrypt";
-import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import { AppError } from "../../utils/AppError.js";
-import { sendMail } from "../../utils/mailer.js";
-import { getEnvNumber } from "../../config/env.js";
-import { UserRepository } from "../users/user.repository.js";
-import { PasswordResetRepository } from "./password-reset.repository.js";
-import { SecurityLogService } from "../security/security-log.service.js";
+import crypto from "crypto";
+import { AppError } from "../../utils/AppError";
+import { UserRepository } from "../users/user.repository";
+import { PasswordResetRepository } from "./password-reset.repository";
+import { sendMail } from "../../utils/mailer";
 
 export class AuthService {
   private userRepo = new UserRepository();
   private resetRepo = new PasswordResetRepository();
-  private securityLogger = new SecurityLogService();
 
+  // 🔐 TOKEN
   private buildAccessToken(userId: string) {
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET as string, {
-      expiresIn: "15m"
-    });
+    return jwt.sign(
+      { id: userId },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "15m" }
+    );
   }
 
-  private buildRefreshToken(userId: string) {
-    return jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET as string, {
-      expiresIn: "7d"
-    });
-  }
+  async register(email: string, password: string) {
+    const existing = await this.userRepo.findByEmail(email);
+    if (existing) throw new AppError("User already exists", 409);
 
-  private getResetExpiryDate() {
-    return new Date(Date.now() + getEnvNumber("RESET_TTL_MINUTES", 60) * 60 * 1000);
-  }
-
-  private getMfaExpiryDate() {
-    return new Date(Date.now() + getEnvNumber("MFA_CODE_TTL_MINUTES", 5) * 60 * 1000);
-  }
-
-  private getLockExpiryDate() {
-    return new Date(Date.now() + getEnvNumber("LOCK_MINUTES", 15) * 60 * 1000);
-  }
-
-  private async assertPasswordNotReused(newPassword: string, currentHash: string, history: string[]) {
-    const hashesToCheck = [currentHash, ...history].slice(0, 4);
-
-    for (const hash of hashesToCheck) {
-      const reused = await bcrypt.compare(newPassword, hash);
-      if (reused) {
-        throw new AppError(
-          "New password cannot match the current password or the last 3 passwords",
-          400,
-          "PASSWORD_REUSE"
-        );
-      }
-    }
-  }
-
-  private async updatePasswordWithHistory(userId: string, newHashedPassword: string, currentHash: string, history: string[]) {
-    const newHistory = [currentHash, ...history].slice(0, 3);
-    await this.userRepo.updateSecurityState(userId, {
-      password: newHashedPassword,
-      passwordHistory: newHistory,
-      mustChangePassword: false,
-      temporaryPasswordExpiresAt: null
-    });
-  }
-
-  async register(email: string, password: string, ipAddress?: string) {
-    const existingUser = await this.userRepo.findByEmail(email);
-
-    if (existingUser) {
-      await this.securityLogger.record("register_failed_existing_email", {
-        userId: existingUser.id,
-        ipAddress,
-        metadata: { email }
-      });
-      throw new AppError("User already exists", 409, "USER_EXISTS");
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashed = await bcrypt.hash(password, 10);
     const user = await this.userRepo.create({
       email,
-      password: hashedPassword,
-      passwordHistory: []
+      password: hashed,
     });
 
-    await this.securityLogger.record("register_success", {
-      userId: user.id,
-      ipAddress,
-      metadata: { email }
-    });
-
-    const { password: _password, ...safeUser } = user.toJSON();
-    return safeUser;
+    const { password: _, ...safe } = user.toJSON();
+    return safe;
   }
 
   async login(email: string, password: string, ipAddress?: string) {
     const user = await this.userRepo.findByEmail(email);
+
     if (!user) {
-      await this.securityLogger.record("login_failed_unknown_email", {
-        ipAddress,
-        metadata: { email }
-      });
-      throw new AppError("Invalid credentials", 401, "INVALID_CREDENTIALS");
-    }
-
-    if (user.lockedUntil && new Date() < new Date(user.lockedUntil)) {
-      await this.securityLogger.record("login_blocked_locked_account", {
-        userId: user.id,
-        ipAddress
-      });
-      throw new AppError("Account temporarily locked. Try again later.", 423, "ACCOUNT_LOCKED");
-    }
-
-    if (user.mustChangePassword && user.temporaryPasswordExpiresAt) {
-      if (new Date() > new Date(user.temporaryPasswordExpiresAt)) {
-        await this.securityLogger.record("login_failed_temp_password_expired", {
-          userId: user.id,
-          ipAddress
-        });
-        throw new AppError("Temporary password expired. Request a new reset.", 401, "TEMP_PASSWORD_EXPIRED");
-      }
+      throw new AppError("Invalid credentials", 401);
     }
 
     const passwordMatches = await bcrypt.compare(password, user.password);
 
     if (!passwordMatches) {
-      const maxAttempts = getEnvNumber("MAX_LOGIN_ATTEMPTS", 5);
-      const nextAttempts = user.failedLoginAttempts + 1;
-      const shouldLock = nextAttempts >= maxAttempts;
-
-      await this.userRepo.updateSecurityState(user.id, {
-        failedLoginAttempts: shouldLock ? 0 : nextAttempts,
-        lockedUntil: shouldLock ? this.getLockExpiryDate() : null
-      });
-
-      await this.securityLogger.record("login_failed_bad_password", {
-        userId: user.id,
-        ipAddress,
-        metadata: { nextAttempts, locked: shouldLock }
-      });
-
-      if (shouldLock) {
-        throw new AppError("Account temporarily locked due to too many failed attempts.", 423, "ACCOUNT_LOCKED");
-      }
-
-      throw new AppError("Invalid credentials", 401, "INVALID_CREDENTIALS");
+      throw new AppError("Invalid credentials", 401);
     }
 
-    const mfaCode = String(Math.floor(100000 + Math.random() * 900000));
-    const mfaCodeHash = await bcrypt.hash(mfaCode, 10);
+    const token = this.buildAccessToken(user.id);
 
-    await this.userRepo.updateSecurityState(user.id, {
-      failedLoginAttempts: 0,
-      lockedUntil: null,
-      mfaCodeHash,
-      mfaCodeExpiresAt: this.getMfaExpiryDate()
-    });
+    const link = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
-    await sendMail(
-      user.email,
-      "Your verification code",
-      `<p>Your verification code is <b>${mfaCode}</b>.</p><p>It expires in ${getEnvNumber("MFA_CODE_TTL_MINUTES", 5)} minutes.</p>`
-    );
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding:20px;">
+        <h2>Login to Job Tracker</h2>
 
-    await this.securityLogger.record("login_password_verified_mfa_sent", {
-      userId: user.id,
-      ipAddress
-    });
+        <p>Click the button below to access your account:</p>
+
+        <a href="${link}" 
+          style="
+            display:inline-block;
+            padding:12px 20px;
+            background:#2563eb;
+            color:white;
+            border-radius:8px;
+            text-decoration:none;
+            font-weight:bold;
+          ">
+          Login to your account
+        </a>
+
+        <p style="margin-top:20px; font-size:12px; color:gray;">
+          This link expires in 15 minutes.
+        </p>
+      </div>
+    `;
+
+    await sendMail(user.email, "Login to Job Tracker", html);
+
+    console.log("🔥 MAGIC LINK SENT:", link);
 
     return {
-      message: "Password verified. MFA code sent to the registered email."
+      message: "Check your email to login.",
     };
   }
 
-  async verifyMfa(email: string, code: string, ipAddress?: string) {
-    const user = await this.userRepo.findByEmail(email);
 
-    if (!user || !user.mfaCodeHash || !user.mfaCodeExpiresAt) {
-      await this.securityLogger.record("mfa_failed_missing_state", {
-        ipAddress,
-        metadata: { email }
-      });
-      throw new AppError("MFA challenge not found", 400, "MFA_NOT_FOUND");
-    }
-
-    if (new Date() > new Date(user.mfaCodeExpiresAt)) {
-      await this.userRepo.updateSecurityState(user.id, {
-        mfaCodeHash: null,
-        mfaCodeExpiresAt: null
-      });
-      await this.securityLogger.record("mfa_failed_expired", {
-        userId: user.id,
-        ipAddress
-      });
-      throw new AppError("MFA code expired", 401, "MFA_EXPIRED");
-    }
-
-    const validCode = await bcrypt.compare(code, user.mfaCodeHash);
-    if (!validCode) {
-      await this.securityLogger.record("mfa_failed_invalid_code", {
-        userId: user.id,
-        ipAddress
-      });
-      throw new AppError("Invalid MFA code", 401, "INVALID_MFA_CODE");
-    }
-
-    await this.userRepo.updateSecurityState(user.id, {
-      mfaCodeHash: null,
-      mfaCodeExpiresAt: null
-    });
-
-    await this.securityLogger.record("login_success", {
-      userId: user.id,
-      ipAddress
-    });
-
-    return {
-      accessToken: this.buildAccessToken(user.id),
-      refreshToken: this.buildRefreshToken(user.id),
-      mustChangePassword: user.mustChangePassword
-    };
-  }
-
-  async refresh(refreshToken: string, ipAddress?: string) {
+  async verifyEmail(token: string) {
     try {
-      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string) as { id: string };
-      await this.securityLogger.record("refresh_success", {
-        userId: decoded.id,
-        ipAddress
-      });
+      const decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET as string
+      ) as { id: string };
+
+      const user = await this.userRepo.findById(decoded.id);
+      if (!user) throw new AppError("User not found", 404);
+
       return {
-        accessToken: this.buildAccessToken(decoded.id)
+        accessToken: token,
       };
     } catch {
-      await this.securityLogger.record("refresh_failed_invalid_token", { ipAddress });
-      throw new AppError("Invalid refresh token", 401, "INVALID_REFRESH_TOKEN");
+      throw new AppError("Invalid or expired token", 400);
     }
   }
 
-  async requestReset(email: string, mode: "link" | "temp" = "link", ipAddress?: string) {
-    const user = await this.userRepo.findByEmail(email);
 
-    if (!user) {
-      await this.securityLogger.record("reset_request_unknown_email", {
-        ipAddress,
-        metadata: { email, mode }
-      });
-      return;
+  async refresh(token: string) {
+    try {
+      const decoded: any = jwt.verify(
+        token,
+        process.env.JWT_REFRESH_SECRET as string
+      );
+
+      const accessToken = jwt.sign(
+        { id: decoded.id },
+        process.env.JWT_SECRET as string,
+        { expiresIn: "15m" }
+      );
+
+      return { accessToken };
+    } catch {
+      throw new AppError("Invalid refresh token", 401);
     }
+  }
 
-    await this.resetRepo.deleteByUserId(user.id);
+
+  async requestReset(email: string, mode: "link" | "temp" = "link") {
+    const user = await this.userRepo.findByEmail(email);
+    if (!user) return;
 
     if (mode === "temp") {
-      const temporaryPassword = crypto.randomBytes(9).toString("base64url");
-      await this.assertPasswordNotReused(temporaryPassword, user.password, user.passwordHistory || []);
+      const temp = crypto.randomBytes(6).toString("base64url");
+      const hashed = await bcrypt.hash(temp, 10);
 
-      const hashedTemporaryPassword = await bcrypt.hash(temporaryPassword, 12);
-
-      await this.userRepo.updateSecurityState(user.id, {
-        password: hashedTemporaryPassword,
-        mustChangePassword: true,
-        temporaryPasswordExpiresAt: this.getResetExpiryDate()
-      });
+      await this.userRepo.updatePassword(user.id, hashed, true);
 
       await sendMail(
         user.email,
-        "Your temporary password",
-        `<p>Your temporary password is <b>${temporaryPassword}</b>.</p><p>It expires in ${getEnvNumber("RESET_TTL_MINUTES", 60)} minutes and must be changed on the next login.</p>`
+        "Temporary password",
+        `<p>Your temporary password: <b>${temp}</b></p>
+         <p>You must change it after login.</p>`
       );
-
-      await this.securityLogger.record("reset_temp_password_sent", {
-        userId: user.id,
-        ipAddress
-      });
 
       return;
     }
 
     const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = this.getResetExpiryDate();
+    const expires = new Date(Date.now() + 1000 * 60 * 30);
 
     await this.resetRepo.create({
       userId: user.id,
       token,
-      expiresAt
+      expiresAt: expires,
     });
 
-    const baseUrl = process.env.APP_BASE_URL || "http://localhost:3000";
-    const link = `${baseUrl}/auth/reset/confirm?token=${token}`;
+    const base =
+      process.env.FRONTEND_URL || "http://localhost:5173";
+
+    const link = `${base}/reset-password?token=${token}`;
 
     await sendMail(
       user.email,
-      "Reset your password",
-      `<p>Use the link below to reset your password. It expires in ${getEnvNumber("RESET_TTL_MINUTES", 60)} minutes.</p><a href="${link}">${link}</a>`
+      "Reset password",
+      `<p>Click to reset your password:</p>
+       <a href="${link}">${link}</a>`
     );
-
-    await this.securityLogger.record("reset_link_sent", {
-      userId: user.id,
-      ipAddress
-    });
   }
 
-  async confirmReset(token: string, newPassword: string, ipAddress?: string) {
-    const resetRecord = await this.resetRepo.findByToken(token);
+  async confirmReset(token: string, newPassword: string) {
+    const rec = await this.resetRepo.findValid(token);
+    if (!rec) throw new AppError("Invalid token", 400);
 
-    if (!resetRecord) {
-      await this.securityLogger.record("reset_confirm_invalid_token", { ipAddress });
-      throw new AppError("Invalid reset token", 400, "INVALID_RESET_TOKEN");
-    }
-
-    if (new Date() > new Date(resetRecord.expiresAt)) {
+    if (new Date() > new Date(rec.expiresAt)) {
       await this.resetRepo.deleteByToken(token);
-      await this.securityLogger.record("reset_confirm_expired_token", {
-        userId: resetRecord.userId,
-        ipAddress
-      });
-      throw new AppError("Reset token expired", 400, "RESET_TOKEN_EXPIRED");
+      throw new AppError("Token expired", 400);
     }
 
-    const user = await this.userRepo.findById(resetRecord.userId);
-    if (!user) {
-      throw new AppError("User not found", 404, "USER_NOT_FOUND");
-    }
+    const hashed = await bcrypt.hash(newPassword, 10);
 
-    await this.assertPasswordNotReused(newPassword, user.password, user.passwordHistory || []);
-
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-    await this.updatePasswordWithHistory(
-      user.id,
-      hashedPassword,
-      user.password,
-      user.passwordHistory || []
-    );
-
+    await this.userRepo.updatePassword(rec.userId, hashed, false);
     await this.resetRepo.deleteByToken(token);
-
-    await this.securityLogger.record("reset_confirm_success", {
-      userId: user.id,
-      ipAddress
-    });
-  }
-
-  async changePasswordAfterTemporaryLogin(userId: string, newPassword: string, ipAddress?: string) {
-    const user = await this.userRepo.findById(userId);
-    if (!user) {
-      throw new AppError("User not found", 404, "USER_NOT_FOUND");
-    }
-
-    if (!user.mustChangePassword) {
-      throw new AppError("Password change not required", 400, "PASSWORD_CHANGE_NOT_REQUIRED");
-    }
-
-    if (user.temporaryPasswordExpiresAt && new Date() > new Date(user.temporaryPasswordExpiresAt)) {
-      throw new AppError("Temporary password expired", 401, "TEMP_PASSWORD_EXPIRED");
-    }
-
-    await this.assertPasswordNotReused(newPassword, user.password, user.passwordHistory || []);
-
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-    await this.updatePasswordWithHistory(
-      user.id,
-      hashedPassword,
-      user.password,
-      user.passwordHistory || []
-    );
-
-    await this.securityLogger.record("temporary_password_changed_successfully", {
-      userId,
-      ipAddress
-    });
   }
 }

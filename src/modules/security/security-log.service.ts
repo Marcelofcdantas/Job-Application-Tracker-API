@@ -1,5 +1,5 @@
-import { AuditLogRepository } from "./audit-log.repository.js";
-import { logger } from "../../utils/logger.js";
+import { AuditLogRepository } from "./audit-log.repository";
+import { logger } from "../../utils/logger";
 
 export class SecurityLogService {
   private repo = new AuditLogRepository();

@@ -8,11 +8,6 @@ export interface LoginDTO {
   password: string;
 }
 
-export interface VerifyMfaDTO {
-  email: string;
-  code: string;
-}
-
 export interface RefreshDTO {
   refreshToken: string;
 }

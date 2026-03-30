@@ -1,4 +1,4 @@
-import { User } from "./user.model.js";
+import { User } from "./user.model";
 
 export class UserRepository {
   async findByEmail(email: string) {
@@ -26,8 +26,6 @@ export class UserRepository {
       passwordHistory: string[];
       failedLoginAttempts: number;
       lockedUntil: Date | null;
-      mfaCodeHash: string | null;
-      mfaCodeExpiresAt: Date | null;
     }>
   ) {
     await User.update(data, { where: { id } });
