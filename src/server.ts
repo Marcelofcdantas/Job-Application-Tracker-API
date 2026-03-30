@@ -1,6 +1,8 @@
 import app from "./app";
 import { connectDB, sequelize } from "./config/database";
 import { logger } from "./utils/logger";
+import dotenv from "dotenv";
+dotenv.config();
 
 const PORT = Number(process.env.PORT || 3000);
 

@@ -23,6 +23,10 @@ router.post("/auth/refresh", authLimiter, validate(refreshSchema), asyncHandler(
 router.post("/auth/reset/request", authLimiter, validate(resetRequestSchema), asyncHandler(auth.requestReset.bind(auth)));
 router.post("/auth/reset/confirm", authLimiter, validate(resetConfirmSchema), asyncHandler(auth.confirmReset.bind(auth)));
 router.post(
+  "/auth/verify-email",
+  asyncHandler(auth.verifyEmail.bind(auth))
+);
+router.post(
   "/auth/password/change-required",
   authLimiter,
   authMiddleware,

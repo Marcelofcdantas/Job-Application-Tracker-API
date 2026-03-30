@@ -10,7 +10,6 @@ export class AuthService {
   private userRepo = new UserRepository();
   private resetRepo = new PasswordResetRepository();
 
-  // 🔐 TOKEN
   private buildAccessToken(userId: string) {
     return jwt.sign(
       { id: userId },
@@ -34,6 +33,7 @@ export class AuthService {
   }
 
   async login(email: string, password: string, ipAddress?: string) {
+    console.log("SIGN SECRET:", process.env.JWT_SECRET);
     const user = await this.userRepo.findByEmail(email);
 
     if (!user) {
@@ -86,22 +86,30 @@ export class AuthService {
 
 
   async verifyEmail(token: string) {
-    try {
-      const decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET as string
-      ) as { id: string };
+  console.log("TOKEN RECEBIDO:", token);
+  console.log("VERIFY SECRET:", process.env.JWT_SECRET);
 
-      const user = await this.userRepo.findById(decoded.id);
-      if (!user) throw new AppError("User not found", 404);
+  try {
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET as string
+    ) as { id: string };
 
-      return {
-        accessToken: token,
-      };
-    } catch {
-      throw new AppError("Invalid or expired token", 400);
-    }
+    console.log("DECODED:", decoded);
+
+    const user = await this.userRepo.findById(decoded.id);
+    if (!user) throw new AppError("User not found", 404);
+
+    return {
+      accessToken: token,
+    };
+
+  } catch (err: any) {
+    console.error("JWT ERROR REAL:", err.message);
+
+    throw new AppError(err.message, 400);
   }
+}
 
 
   async refresh(token: string) {
