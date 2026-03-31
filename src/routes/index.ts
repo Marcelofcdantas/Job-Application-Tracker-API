@@ -13,6 +13,9 @@ import { validate } from "../middleware/validate.middleware";
 import { authMiddleware } from "../middleware/auth.middleware";
 import { authLimiter } from "../middleware/rate-limit";
 import { z } from "zod";
+import { ApplicationController } from "../modules/applications/application.controller";
+
+const application = new ApplicationController();
 
 const router = Router();
 const auth = new AuthController();
@@ -32,6 +35,30 @@ router.post(
   authMiddleware,
   validate(z.object({ newPassword: passwordSchema })),
   asyncHandler(auth.changePasswordAfterTemporaryLogin.bind(auth))
+);
+
+router.post(
+  "/applications",
+  authMiddleware,
+  asyncHandler(application.create.bind(application))
+);
+
+router.get(
+  "/applications",
+  authMiddleware,
+  asyncHandler(application.getAll.bind(application))
+);
+
+router.put(
+  "/applications/:id",
+  authMiddleware,
+  asyncHandler(application.update.bind(application))
+);
+
+router.delete(
+  "/applications/:id",
+  authMiddleware,
+  asyncHandler(application.delete.bind(application))
 );
 
 export default router;
