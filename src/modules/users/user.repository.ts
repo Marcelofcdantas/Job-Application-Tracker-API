@@ -12,7 +12,6 @@ export class UserRepository {
   async create(data: {
     email: string;
     password: string;
-    passwordHistory: string[];
   }) {
     return User.create(data);
   }
@@ -26,8 +25,50 @@ export class UserRepository {
       passwordHistory: string[];
       failedLoginAttempts: number;
       lockedUntil: Date | null;
+      token_version: number;
     }>
   ) {
-    await User.update(data, { where: { id } });
+    const updateData: Record<string, unknown> = {
+      ...data,
+    };
+
+    if (data.passwordHistory !== undefined) {
+      updateData.password_history = data.passwordHistory;
+      delete updateData.passwordHistory;
+    }
+
+    await User.update(updateData, { where: { id } });
+  }
+
+  async saveResetToken(userId: string, token: string, expires: Date) {
+    return User.update(
+      {
+        reset_token: token,
+        reset_token_expires: expires,
+      },
+      {
+        where: { id: userId },
+      }
+    );
+  }
+
+  async findByResetToken(token: string) {
+    return User.findOne({
+      where: {
+        reset_token: token,
+      },
+    });
+  }
+
+  async clearResetToken(userId: string) {
+    return User.update(
+      {
+        reset_token: null,
+        reset_token_expires: null,
+      },
+      {
+        where: { id: userId },
+      }
+    );
   }
 }

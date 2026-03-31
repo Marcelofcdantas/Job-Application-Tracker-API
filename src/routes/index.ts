@@ -14,6 +14,7 @@ import { authMiddleware } from "../middleware/auth.middleware";
 import { authLimiter } from "../middleware/rate-limit";
 import { z } from "zod";
 import { ApplicationController } from "../modules/applications/application.controller";
+import { resetPasswordLimiter } from "../utils/limiter";
 
 const application = new ApplicationController();
 
@@ -23,7 +24,7 @@ const auth = new AuthController();
 router.post("/auth/register", authLimiter, validate(registerSchema), asyncHandler(auth.register.bind(auth)));
 router.post("/auth/login", authLimiter, validate(loginSchema), asyncHandler(auth.login.bind(auth)));
 router.post("/auth/refresh", authLimiter, validate(refreshSchema), asyncHandler(auth.refresh.bind(auth)));
-router.post("/auth/reset/request", authLimiter, validate(resetRequestSchema), asyncHandler(auth.requestReset.bind(auth)));
+router.post("/auth/reset/request", authLimiter, resetPasswordLimiter, validate(resetRequestSchema), asyncHandler(auth.requestReset.bind(auth)));
 router.post("/auth/reset/confirm", authLimiter, validate(resetConfirmSchema), asyncHandler(auth.confirmReset.bind(auth)));
 router.post(
   "/auth/verify-email",

@@ -4,7 +4,13 @@ export class ApplicationService {
   private repo = new ApplicationRepository();
 
   create(userId: string, data: any) {
-    return this.repo.create({ ...data, userId });
+    const today = new Date().toISOString().split("T")[0];
+
+    return this.repo.create({
+      ...data,
+      appliedDate: data.appliedDate || today,
+      userId,
+    });
   }
 
   getAll(userId: string) {
@@ -12,7 +18,12 @@ export class ApplicationService {
   }
 
   update(userId: string, id: string, data: any) {
-    return this.repo.update(userId, id, data);
+    const today = new Date().toISOString().split("T")[0];
+
+    return this.repo.update(userId, id, {
+      ...data,
+      appliedDate: data.appliedDate || today,
+    });
   }
 
   delete(userId: string, id: string) {

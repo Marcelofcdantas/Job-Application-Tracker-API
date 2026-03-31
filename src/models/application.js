@@ -12,7 +12,8 @@ module.exports = (sequelize, DataTypes) => {
     platform: DataTypes.STRING,
     status: DataTypes.STRING,
     appliedDate: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATEONLY,
+      allowNull: false,
       defaultValue: DataTypes.NOW
     },
     userId: DataTypes.UUID

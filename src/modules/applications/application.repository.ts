@@ -1,4 +1,4 @@
-import db from "../../models/index.js";
+import db from "../../models/index";
 
 export class ApplicationRepository {
   create(data: any) {
@@ -9,8 +9,16 @@ export class ApplicationRepository {
     return db.Application.findAll({ where: { userId } });
   }
 
-  update(userId: string, id: string, data: any) {
-    return db.Application.update(data, {
+  async update(userId: string, id: string, data: any) {
+    const [updatedRows] = await db.Application.update(data, {
+      where: { id, userId },
+    });
+
+    if (updatedRows === 0) {
+      throw new Error("Application not found or not updated");
+    }
+
+    return db.Application.findOne({
       where: { id, userId },
     });
   }
