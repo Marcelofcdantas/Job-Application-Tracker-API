@@ -33,11 +33,17 @@ export class AuthService {
   private userRepo = new UserRepository();
   private resetRepo = new PasswordResetRepository();
 
-  private buildAccessToken(userId: string, tokenVersion: number) {
+  private buildAccessToken(
+    userId: string,
+    tokenVersion: number,
+    rememberMe: boolean = false
+  ) {
+    const expiresIn = rememberMe ? "7d" : "15m";
+
     return jwt.sign(
       { id: userId, tokenVersion },
       process.env.JWT_SECRET as string,
-      { expiresIn: "15m" }
+      { expiresIn }
     );
   }
 
