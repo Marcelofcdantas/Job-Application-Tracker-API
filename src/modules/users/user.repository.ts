@@ -52,6 +52,14 @@ export class UserRepository {
     );
   }
 
+async findByVerificationToken(token: string) {
+  return User.findOne({ where: { emailVerificationToken: token } });
+}
+
+async update(userId: string, data: any) {
+  return User.update(data, { where: { id: userId } });
+}
+
   async findByResetToken(token: string) {
     return User.findOne({
       where: {

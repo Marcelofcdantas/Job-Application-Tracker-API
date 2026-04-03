@@ -16,19 +16,29 @@ export class AuthController {
 
   async login(req: Request, res: Response) {
     const { email, password, rememberMe} = req.body;
-    const data = await service.login(email, password, req.ip);
+    const data = await service.login(email, password, rememberMe, req.ip);
 
     return res.json({
       data,
-      message: "Login link sent to your email."
+      message: "Login successful."
     });
   }
 
   async verifyEmail(req: Request, res: Response) {
-  const { token } = req.body;
-  const data = await service.verifyEmail(token);
+    const { token } = req.body;
+    const data = await service.verifyEmail(token);
 
-  return res.json({ data });
+    return res.json({ data });
+    }
+
+    async resendVerification(req: Request, res: Response) {
+    const { email } = req.body;
+
+    await service.resendVerification(email);
+
+    return res.json({
+      message: "If the email exists, a verification email was sent"
+    });
   }
 
   async refresh(req: Request, res: Response) {

@@ -13,8 +13,24 @@ export class ApplicationService {
     });
   }
 
+  archive(userId: string, id: string) {
+    return this.repo.archive(userId, id);
+  }
+
+  getArchived(userId: string) {
+    return this.repo.findArchivedByUser(userId);
+  }
+
+  restore(userId: string, id: string) {
+    return this.repo.update(userId, id, { archived: false });
+  }
+
   getAll(userId: string) {
     return this.repo.findAllByUser(userId);
+  }
+
+  getById(userId: string, id: string) {
+    return this.repo.findById(userId, id);
   }
 
   update(userId: string, id: string, data: any) {

@@ -50,6 +50,18 @@ User.init(
       allowNull: true,
       defaultValue: [],
     },
+    isEmailVerified: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    emailVerificationLastSentAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    emailVerificationToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   },
   {
     sequelize,

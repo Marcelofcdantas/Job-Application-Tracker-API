@@ -50,6 +50,18 @@ router.get(
   asyncHandler(application.getAll.bind(application))
 );
 
+router.get(
+  "/applications/archived",
+  authMiddleware,
+  asyncHandler(application.getArchived.bind(application))
+);
+
+router.get(
+  "/applications/:id",
+  authMiddleware,
+  asyncHandler(application.getById.bind(application))
+);
+
 router.put(
   "/applications/:id",
   authMiddleware,
@@ -60,6 +72,12 @@ router.delete(
   "/applications/:id",
   authMiddleware,
   asyncHandler(application.delete.bind(application))
+);
+
+router.post(
+  "/applications/:id/archive",
+  authMiddleware,
+  asyncHandler(application.archive.bind(application))
 );
 
 export default router;

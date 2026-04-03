@@ -6,7 +6,26 @@ export class ApplicationRepository {
   }
 
   findAllByUser(userId: string) {
-    return db.Application.findAll({ where: { userId } });
+    return db.Application.findAll({ where: { userId, archived: false } });
+  }
+
+  findArchivedByUser(userId: string) {
+    return db.Application.findAll({
+      where: { userId, archived: true },
+    });
+  }
+
+  archive(userId: string, id: string) {
+    return db.Application.update(
+      { archived: true },
+      { where: { id, userId } }
+    );
+  }
+
+  findById(userId: string, id: string) {
+    return db.Application.findOne({
+      where: { id, userId },
+    });
   }
 
   async update(userId: string, id: string, data: any) {

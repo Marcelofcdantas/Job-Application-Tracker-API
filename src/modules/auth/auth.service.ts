@@ -54,16 +54,33 @@ export class AuthService {
     validatePassword(password);
 
     const hashed = await bcrypt.hash(password, 10);
+
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+
     const user = await this.userRepo.create({
       email,
       password: hashed,
+      isEmailVerified: false,
+      emailVerificationToken: verificationToken,
     });
+
+    const verifyLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+
+    await sendMail(
+      user.email,
+      "Verify your email",
+      `
+      <h2>Welcome!</h2>
+      <p>Click below to verify your email:</p>
+      <a href="${verifyLink}">Verify Email</a>
+      `
+    );
 
     const { password: _password, ...safe } = user.toJSON();
     return safe;
   }
 
-  async login(email: string, password: string, _ipAddress?: string) {
+  async login(email: string, password: string, rememberMe: boolean = false, _ipAddress?: string) {
     const user = await this.userRepo.findByEmail(email);
 
     if (!user) {
@@ -76,58 +93,92 @@ export class AuthService {
       throw new AppError("Invalid credentials", 401);
     }
 
-    const token = this.buildAccessToken(user.id, user.token_version);
-    const link = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+    if (!user.isEmailVerified) {
 
-    const html = `
-      <div style="font-family: Arial, sans-serif; padding:20px;">
-        <h2>Login to Job Tracker</h2>
-        <p>Click the button below to access your account:</p>
-        <a href="${link}"
-          style="
-            display:inline-block;
-            padding:12px 20px;
-            background:#2563eb;
-            color:white;
-            border-radius:8px;
-            text-decoration:none;
-            font-weight:bold;
-          ">
-          Login to your account
-        </a>
-        <p style="margin-top:20px; font-size:12px; color:gray;">
-          This link expires in 15 minutes.
-        </p>
-      </div>
-    `;
+      const now = new Date();
 
-    await sendMail(user.email, "Login to Job Tracker", html);
+      const canResend =
+        !user.emailVerificationLastSentAt ||
+        now.getTime() - new Date(user.emailVerificationLastSentAt).getTime() > 15 * 60 * 1000;
 
-    return {
-      message: "Check your email to login.",
-    };
+      if (canResend) {
+        const token = crypto.randomBytes(32).toString("hex");
+
+        await this.userRepo.update(user.id, {
+          emailVerificationToken: token,
+          emailVerificationLastSentAt: new Date(),
+        });
+
+        const verifyLink = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+
+        await sendMail(user.email, "Verify your email", `
+          <p>Click below to verify your email:</p>
+          <a href="${verifyLink}">Verify Email</a>
+        `);
+      }
+
+      const nextTryIn = user.emailVerificationLastSentAt
+        ? Math.ceil(
+            (15 * 60 * 1000 - (now.getTime() - new Date(user.emailVerificationLastSentAt).getTime())) / 60000
+          )
+        : 0;
+
+      let message = "Email not verified. Check your inbox.";
+
+      if (nextTryIn === 1) {
+        message += " Try again in 1 minute.";
+      } else if (nextTryIn > 1) {
+        message += ` Try again in ${nextTryIn} minutes.`;
+      }
+
+      throw new AppError(message, 403);
+    }
+
+    const accessToken = this.buildAccessToken(user.id, user.token_version, rememberMe);
+
+    return { accessToken };
   }
 
   async verifyEmail(token: string) {
-    try {
-      const decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET as string
-      ) as { id: string; tokenVersion: number };
+    const user = await this.userRepo.findByVerificationToken(token);
 
-      const user = await this.userRepo.findById(decoded.id);
-      if (!user) throw new AppError("User not found", 404);
-
-      if (user.token_version !== decoded.tokenVersion) {
-        throw new AppError("Session expired", 401);
-      }
-
-      return {
-        accessToken: token,
-      };
-    } catch (err: any) {
-      throw new AppError(err.message || "Invalid token", 400);
+    if (!user) {
+      throw new AppError("Invalid or expired token", 400);
     }
+
+    await this.userRepo.update(user.id, {
+      isEmailVerified: true,
+      emailVerificationToken: null,
+    });
+
+    return { message: "Email verified successfully" };
+  }
+
+  async resendVerification(email: string) {
+    const user = await this.userRepo.findByEmail(email);
+
+    if (!user) return;
+
+    if (user.isEmailVerified) {
+      throw new AppError("Email already verified", 400);
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+
+    await this.userRepo.update(user.id, {
+      emailVerificationToken: token,
+    });
+
+    const verifyLink = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+
+    await sendMail(
+      user.email,
+      "Verify your email",
+      `
+      <p>Click below to verify your email:</p>
+      <a href="${verifyLink}">Verify Email</a>
+      `
+    );
   }
 
   async refresh(token: string, _ipAddress?: string) {

@@ -16,10 +16,44 @@ export class ApplicationController {
     return res.json(apps);
   }
 
+  async archive(req: Request, res: Response) {
+    const userId = (req as any).user.id;
+    const id = String(req.params.id);
+
+    await this.service.archive(userId, id);
+
+    return res.json({ message: "Archived" });
+  }
+
+  async getArchived(req: Request, res: Response) {
+    const userId = (req as any).user.id;
+    const apps = await this.service.getArchived(userId);
+
+    return res.json(apps);
+  }
+
+  async restore(req: Request, res: Response) {
+    const userId = (req as any).user.id;
+    const id = String(req.params.id);
+
+    await this.service.restore(userId, id);
+
+    return res.json({ message: "Restored" });
+  }
+
   async update(req: Request, res: Response) {
     const userId = (req as any).user.id;
     const id = String(req.params.id);
     const app = await this.service.update(userId, id, req.body);
+    return res.json(app);
+  }
+
+  async getById(req: Request, res: Response) {
+    const userId = (req as any).user.id;
+    const id = String(req.params.id);
+
+    const app = await this.service.getById(userId, id);
+
     return res.json(app);
   }
 
