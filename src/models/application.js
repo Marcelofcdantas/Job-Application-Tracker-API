@@ -41,6 +41,22 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    stages: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    },
+    currentStage: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    history: {
+      type: DataTypes.JSON,
+      allowNull: true,
+    },
+    interviewDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
   });
 
   return Application;

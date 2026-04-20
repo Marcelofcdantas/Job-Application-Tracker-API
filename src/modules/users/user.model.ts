@@ -4,6 +4,7 @@ import { sequelize } from "../../config/database";
 export class User extends Model {
   public id!: string;
   public email!: string;
+  public name!: string;
   public password!: string;
   public mustChangePassword!: boolean;
   public reset_token!: string | null;
@@ -23,6 +24,10 @@ User.init(
       type: DataTypes.STRING,
       unique: true,
       allowNull: false,
+    },
+    name: { 
+      type: DataTypes.STRING, 
+      allowNull: true
     },
     password: {
       type: DataTypes.STRING,

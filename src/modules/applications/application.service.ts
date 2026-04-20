@@ -10,6 +10,10 @@ export class ApplicationService {
       ...data,
       appliedDate: data.appliedDate || today,
       userId,
+      stages: [],
+      currentStage: "APPLIED",
+      history: [],
+      interviewDate: null,
     });
   }
 
@@ -39,6 +43,10 @@ export class ApplicationService {
     return this.repo.update(userId, id, {
       ...data,
       appliedDate: data.appliedDate || today,
+      stages: data.stages || [],
+      currentStage: data.currentStage || "APPLIED",
+      history: data.history || [],
+      interviewDate: data.interviewDate || null,
     });
   }
 

@@ -5,8 +5,8 @@ const service = new AuthService();
 
 export class AuthController {
   async register(req: Request, res: Response) {
-    const { email, password } = req.body;
-    const user = await service.register(email, password, req.ip);
+    const { email, password, name } = req.body;
+    const user = await service.register(email, password, name, req.ip);
 
     return res.status(201).json({
       data: user,
@@ -21,6 +21,15 @@ export class AuthController {
     return res.json({
       data,
       message: "Login successful."
+    });
+  }
+
+  async getMe(req: Request, res: Response) {
+    const { userId } = req.body;
+    const data = await service.getMe(userId);
+
+    return res.json({
+      data
     });
   }
 

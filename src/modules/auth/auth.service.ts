@@ -17,14 +17,16 @@ function validatePassword(password: string) {
   }
 }
 
-async function ensurePasswordWasNotUsedBefore(
-  newPassword: string,
-  passwordHistory: string[] = []
-) {
+async function ensurePasswordWasNotUsedBefore(newPassword: string, passwordHistory: string[] = []) {
   for (const oldHash of passwordHistory) {
     const match = await bcrypt.compare(newPassword, oldHash);
     if (match) {
-      throw new AppError("You cannot reuse your last 3 passwords", 400);
+      throw new AppError(
+        "You cannot reuse your last 3 passwords", 
+        400, 
+        "PASSWORD_REUSE", 
+        false 
+      );
     }
   }
 }
@@ -47,7 +49,14 @@ export class AuthService {
     );
   }
 
-  async register(email: string, password: string, _ipAddress?: string) {
+  async getMe(userId: string) {
+    const user = await this.userRepo.findById(userId);
+    if (!user) throw new AppError("User not found", 404);
+    
+    return { id: user.id, name: user.name };
+  }
+
+  async register(email: string, password: string, name: string, _ipAddress?: string) {
     const existing = await this.userRepo.findByEmail(email);
     if (existing) throw new AppError("User already exists", 409);
 
@@ -60,6 +69,7 @@ export class AuthService {
     const user = await this.userRepo.create({
       email,
       password: hashed,
+      name: name || undefined,
       isEmailVerified: false,
       emailVerificationToken: verificationToken,
     });

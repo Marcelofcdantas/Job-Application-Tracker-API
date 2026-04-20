@@ -12,6 +12,7 @@ export class UserRepository {
   async create(data: {
     email: string;
     password: string;
+    name?: string;
   }) {
     return User.create(data);
   }
