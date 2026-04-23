@@ -1,33 +1,32 @@
 # Digital Bank Ready Backend
 
-Implementado com foco em segurança de nível banco digital:
+Implemented with a focus on digital bank-level security:
 
-- validação forte com Zod
-- AppError + middleware global
+- Strong validation with Zod
+- AppError + global middleware
 - asyncHandler
-- logger estruturado com pino
-- access token + refresh token
-- reset de senha por link ou senha temporária (1h)
-- bloqueio de reutilização das últimas 3 senhas
-- MFA por código enviado por email
-- bloqueio após tentativas inválidas
-- trilha de auditoria / eventos de segurança
-- rate limiting
+- Structured logging with Pino
+- Access token + refresh token
+- Password reset via link or temporary password (1h)
+- Prevention of reusing the last 3 passwords
+- MFA via email verification code
+- Account lockout after invalid attempts
+- Audit trail / security events
+- Rate limiting
 
-## Fluxo de login
+## Login Flow
 1. `POST /auth/login`
-2. Se credenciais OK, código MFA é enviado por email
+2. If credentials are OK, MFA code is sent via email
 3. `POST /auth/mfa/verify`
-4. Recebe accessToken e refreshToken
+4. Receive accessToken and refreshToken
 
-## Reset de senha
-- `POST /auth/reset/request` com `mode: "link"` ou `mode: "temp"`
-- link e senha temporária expiram em 1 hora
-- nova senha não pode repetir nenhuma das últimas 3
+## Password Reset
+- `POST /auth/reset/request` with `mode: "link"` or `mode: "temp"`
+- Link and temporary password expire in 1 hour
+- New password cannot reuse any of the last 3 passwords
 
-## Instalação
+## Installation
 ```bash
 npm install
 cp .env.example .env
 npm run dev
-```
